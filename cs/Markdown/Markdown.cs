@@ -1,9 +1,16 @@
 ﻿namespace Markdown;
 
-public class Md
+public static class Markdown
 {
-    public string Main(string markdown)
+    public static string ToHtml(string markdownText)
     {
-        return "html";
+        var tokenizer = new Tokenizer(markdownText);
+        var tokens = tokenizer.Tokenize();
+
+        var parser = new TextParser(tokens);
+        var nodes = parser.Parse();
+
+        var renderer = new HtmlRenderer();
+        return renderer.Render(nodes).Replace("\r", "");
     }
 }
