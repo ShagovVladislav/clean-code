@@ -1,72 +1,127 @@
-﻿namespace Markdown;
+﻿using System;
+using System.Collections.Generic;
 
-public class Tokenizer
+namespace Markdown
 {
-    private readonly string _text;
-    private int _position;
-
-    public Tokenizer(string text)
+    public class Tokenizer
     {
-        _text = text.Replace("\r", "");
-        _position = 0;
-    }
-    
-    private char Current => _position < _text.Length ? _text[_position] : '\0';
-    private void Advance(int count = 1) => _position += count;
+        private readonly string _text;
+        private int _position;
 
-    private char Peek(int offset = 1)
-    {
-        int pos = _position + offset;
-        return pos < _text.Length ? _text[pos] : '\0';
-    }
+        private static readonly HashSet<char> Escapable = new() { '\\', '#', '_' };
+        private static readonly HashSet<char> StopChars = new() { '#', '_', '\\', '\n' };
 
-    public List<Token> Tokenize()
-    {
-        var tokens = new List<Token>();
-
-        while (_position < _text.Length)
+        public Tokenizer(string text)
         {
-            if (Current == '#')
-            {
-                int start = _position;
-                while (Current == '#')
-                    Advance();
+            _text = text.Replace("\r", "");
+            _position = 0;
+        }
 
-                string hashes = _text.Substring(start, _position - start);
-                tokens.Add(new Token(TokenType.Heading, hashes));
-            }
-            else if (Current == '_' && Peek() == '_')
+        private char Current => _position < _text.Length ? _text[_position] : '\0';
+        private char Peek(int offset = 1)
+        {
+            int pos = _position + offset;
+            return pos < _text.Length ? _text[pos] : '\0';
+        }
+
+        private bool HasMore => _position < _text.Length;
+
+        private void Advance(int count = 1) => _position += count;
+
+        private static bool IsEscapable(char c) => Escapable.Contains(c);
+
+        public List<Token> Tokenize()
+        {
+            var tokens = new List<Token>();
+
+            while (HasMore)
             {
-                Advance(2);
-                tokens.Add(new Token(TokenType.BoldStart, "__"));
+                if (TryReadEscape(tokens)) continue;
+                if (TryReadHeading(tokens)) continue;
+                if (TryReadFormatting(tokens)) continue;
+                if (TryReadNewLine(tokens)) continue;
+
+                TryReadText(tokens);
             }
-            else if (Current == '_')
+
+            tokens.Add(new Token(TokenType.EndOfFile));
+            return tokens;
+        }
+        
+        private bool TryReadEscape(List<Token> tokens)
+        {
+            if (Current != '\\') return false;
+
+            char next = Peek();
+            if (next != '\0' && IsEscapable(next))
             {
                 Advance();
-                tokens.Add(new Token(TokenType.ItalicStart, "_"));
-            }
-            else if (Current == '\n')
-            {
+                tokens.Add(new Token(TokenType.Text, next.ToString()));
                 Advance();
-                tokens.Add(new Token(TokenType.NewLine, "\\n"));
             }
             else
             {
-                string text = ReadText();
-                tokens.Add(new Token(TokenType.Text, text));
+                Advance();
+                tokens.Add(new Token(TokenType.Text, "\\"));
             }
+            return true;
         }
-        tokens.Add(new Token(TokenType.EndOfFile));
-        return tokens;
-    }
 
-    private string ReadText()
-    {
-        int start = _position;
-        while (_position < _text.Length && !"#_\n".Contains(Current))
+        private bool TryReadHeading(List<Token> tokens)
+        {
+            if (Current != '#') return false;
+
+            int start = _position;
+            while (Current == '#') Advance();
+            string hashes = _text[start.._position];
+
+            tokens.Add(new Token(TokenType.Heading, hashes));
+
+            if (Current == ' ') Advance();
+            return true;
+        }
+
+        private bool TryReadFormatting(List<Token> tokens)
+        {
+            if (Current == '_' && Peek() == '_')
+            {
+                Advance(2);
+                tokens.Add(new Token(TokenType.BoldStart, "__"));
+                return true;
+            }
+            if (Current == '_')
+            {
+                Advance();
+                tokens.Add(new Token(TokenType.ItalicStart, "_"));
+                return true;
+            }
+
+            return false;
+        }
+
+        private bool TryReadNewLine(List<Token> tokens)
+        {
+            if (Current != '\n') return false;
+
             Advance();
+            tokens.Add(new Token(TokenType.NewLine, "\n"));
+            return true;
+        }
 
-        return _text.Substring(start, _position - start);
+        private bool TryReadText(List<Token> tokens)
+        {
+            int start = _position;
+            while (HasMore && !StopChars.Contains(Current))
+                Advance();
+
+            if (_position > start)
+            {
+                string text = _text[start.._position];
+                tokens.Add(new Token(TokenType.Text, text));
+                return true;
+            }
+
+            return false;
+        }
     }
-    
 }
