@@ -1,81 +1,52 @@
-﻿using System.Text;
-
-namespace Markdown;
-
-public abstract class Node
-{
-    public abstract void ToHtml(StringBuilder sb);
-}
-
-class Heading : Node
-{
-    public int Level { get; }
-    public string Content { get; }
-
-    public Heading(int level, string content)
+﻿namespace Markdown;
+    public abstract class Node
     {
-        Level = level;
-        Content = content;
-    }
-    override public void ToHtml(StringBuilder sb)
-    {
-        sb.Append($"<h{Level}>{Content}</h{Level}>");
-    }
-}
+        public List<Node> Children { get; init; } = [];
 
-class Paragraph : Node
-{
-    private string Content { get; }
+        protected abstract string Tag { get; }
 
-    public Paragraph(string content)
-    {
-        Content = content;
-    }
-    override public void ToHtml(StringBuilder sb)
-    {
-        sb.Append($"<p>{Content}</p>");
-    }
-}
+        public virtual string ConvertToHtml()
+        {
+            if (Children.Count == 0)
+                return string.Empty;
 
-class Italic : Node
-{
-    private string Content { get; }
-
-    public Italic(string content)
-    {
-        Content = content;
-    }
-    override public void ToHtml(StringBuilder sb)
-    {
-        sb.Append($"<em>{Content}</em>");
-    }
-}
-
-class Bold : Node
-{
-    private string Content { get; }
-
-    public Bold(string content)
-    {
-        Content = content;
-    }
-    override public void ToHtml(StringBuilder sb)
-    {
-        sb.Append($"<strong>{Content}</strong>");
-    }
-}
-
-class Text : Node
-{
-    public string Content { get; }
-
-    public Text(string content)
-    {
-        Content = content;
+            var innerHtml = string.Concat(Children.Select(c => c.ConvertToHtml()));
+            return $"<{Tag}>{innerHtml}</{Tag}>";
+        }
     }
 
-    public override void ToHtml(StringBuilder sb)
+
+    public class HeadingNode(int level) : Node
     {
-        sb.Append(Content);
+        private int Level { get; } = Math.Clamp(level, MinLevel, MaxLevel);
+        protected override string Tag => $"h{Level}";
+
+        public const int MaxLevel = 6;
+        public const int MinLevel = 1;
     }
-}
+
+    internal class ParagraphNode : Node
+    {
+        protected override string Tag => "p";
+    }
+
+    public class ItalicNode : Node
+    {
+        protected override string Tag => "em";
+    }
+
+ 
+    public class BoldNode : Node
+    {
+        protected override string Tag => "strong";
+    }
+
+
+    public class TextNode(string content) : Node
+    {
+        private string Content { get; } = content;
+        
+        protected override string Tag => string.Empty;
+        
+        public override string ConvertToHtml() => Content;
+    }

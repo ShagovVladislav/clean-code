@@ -1,108 +1,127 @@
-﻿using System.Collections.Generic;
-using System.Text;
+﻿namespace Markdown;
 
-namespace Markdown;
-public class TextParser
+public class TextParser(List<Token> tokens)
 {
-    private readonly List<Token> _tokens;
-    private int _pos;
+    private int pos;
 
-    public TextParser(List<Token> tokens)
-    {
-        _tokens = tokens;
-        _pos = 0;
-    }
-
-    private Token Current => _pos < _tokens.Count ? _tokens[_pos] : new Token(TokenType.EndOfFile);
-    private void Advance() => _pos++;
+    private Token Current => pos < tokens.Count ? tokens[pos] : Token.EndOfFile();
+    private void Advance() => pos++;
 
     public List<Node> Parse()
     {
-    var nodes = new List<Node>();
+        var nodes = new List<Node>();
 
-    while (Current.Type != TokenType.EndOfFile)
-    {
-        if (Current.Type == TokenType.NewLine)
+        while (Current.Type != TokenType.EndOfFile)//пока не токен с концом
         {
-            Advance();
-            continue;
+            if (Current.Type == TokenType.NewLine)//если перенос - скип
+            {
+                Advance();
+                continue;
+            }
+
+            var isHeading = Current.Type == TokenType.Heading;//это заголовок?
+            var level = 0;//ур заголовка
+            if (isHeading)
+                level = GetHeadingLevel();//получаем уровень если это заголовок
+
+            var contentNodes = ParseInlineElements();//получаем содержимое заголовка или параграфа
+
+            Node blockNode = isHeading ? new HeadingNode(level) : new ParagraphNode();// создаём заголовок или параграф
+            blockNode.Children.AddRange(contentNodes);// добавляем в дети узлы содержимого
+            nodes.Add(blockNode);//добавляем в общий список узлов уже заполненный заголовок или параграф
+
+            if (Current.Type == TokenType.NewLine)
+                Advance();
         }
 
-        if (Current.Type == TokenType.Heading)
-        {
-            string hashes = Current.Value ?? "";
-            int level = Math.Min(6, Math.Max(1, hashes.Length)); 
-            Advance();
-            
-            var contentNodes = ParseInlineElements();
-            var sb = new StringBuilder();
-            foreach (var n in contentNodes)
-                n.ToHtml(sb);
-                
-            nodes.Add(new Heading(level, sb.ToString()));
-        }
-        else
-        {
-            var contentNodes = ParseInlineElements();
-            var sb = new StringBuilder();
-            foreach (var n in contentNodes)
-                n.ToHtml(sb);
+        return nodes;//вернули список узлов
 
-            nodes.Add(new Paragraph(sb.ToString()));
-        }
-        
-        if (Current.Type == TokenType.NewLine)
+        int GetHeadingLevel()
+        {
+            var hashes = Current.Value;
+            var level = Math.Clamp(hashes.Length, HeadingNode.MinLevel, HeadingNode.MaxLevel);
             Advance();
+            return level;
+        }
     }
 
-    return nodes;
-}
-
-    private List<Node> ParseInlineElements()
+    private List<Node> ParseInlineElements()//парсинг всех bold, italic etc
     {
-        var contentNodes = new List<Node>();
+        var contentNodes = new List<Node>();//список внутренних нод
 
-        while (Current.Type != TokenType.NewLine && Current.Type != TokenType.EndOfFile)
+        while (HasContent())
         {
-            if (Current.Type == TokenType.BoldStart)
+            switch (Current.Type)
             {
-                Advance(); 
-                string inner = ReadInlineUntil(TokenType.BoldStart, TokenType.EndOfFile);
-                contentNodes.Add(new Bold(inner));
-                if (Current.Type == TokenType.BoldStart)
+                case TokenType.BoldStart:
+                    contentNodes.Add(ParseStyledNode(TokenType.BoldStart, 
+                        innerNodes => new BoldNode { Children = innerNodes }));
+                    break;
+                case TokenType.ItalicStart:
+                    contentNodes.Add(ParseStyledNode(TokenType.ItalicStart, 
+                        innerNodes => new ItalicNode { Children = innerNodes }));
+                    break;
+                case TokenType.Text:
+                    contentNodes.Add(new TextNode(Current.Value));
                     Advance();
-            }
-            else if (Current.Type == TokenType.ItalicStart)
-            {
-                Advance(); 
-                string inner = ReadInlineUntil(TokenType.ItalicStart, TokenType.EndOfFile);
-                contentNodes.Add(new Italic(inner));
-                if (Current.Type == TokenType.ItalicStart)
-                    Advance(); 
-            }
-            else if (Current.Type == TokenType.Text)
-            {
-                contentNodes.Add(new Text(Current.Value));
-                Advance();
-            }
-            else
-            {
-                Advance(); 
+                    break;
+                default:
+                    Advance();
+                    break;
             }
         }
-        
+
         return contentNodes;
     }
-    private string ReadInlineUntil(TokenType stop, TokenType end)
+
+    private Node ParseStyledNode(TokenType startType, Func<List<Node>, Node> factory)
     {
-        var sb = new StringBuilder();
-        while (Current.Type != end && Current.Type != stop)
+        
+        TokenType endType;
+        switch (startType)
         {
-            if (Current.Type == TokenType.Text)
-                sb.Append(Current.Value);
-            Advance();
+            case TokenType.ItalicStart:
+                endType = TokenType.ItalicEnd;
+                break;
+            case TokenType.BoldStart:
+                endType = TokenType.BoldEnd;
+                break;
+            default: 
+                endType = startType;
+                break;
         }
-        return sb.ToString();
+
+        Advance();
+        var inner = new List<Node>();
+
+        while (Current.Type != TokenType.EndOfFile && Current.Type != endType && Current.Type != TokenType.NewLine)
+        {
+            switch (Current.Type)
+            {
+                case TokenType.Text:
+                    inner.Add(new TextNode(Current.Value));
+                    Advance();
+                    break;
+                case TokenType.ItalicStart:
+                    inner.Add(ParseStyledNode(TokenType.ItalicStart, c => new ItalicNode { Children = c }));
+                    break;
+                case TokenType.BoldStart:
+                    inner.Add(ParseStyledNode(TokenType.BoldStart, c => new BoldNode { Children = c }));
+                    break;
+                default:
+                    Advance();
+                    break;
+            }
+        }
+
+        if (Current.Type == endType)
+            Advance(); 
+
+        return factory(inner);
+    }
+
+    private bool HasContent()
+    {
+        return Current.Type != TokenType.NewLine && Current.Type != TokenType.EndOfFile;
     }
 }
-
