@@ -8,8 +8,7 @@ public static class Md
         var tokens = tokenizer.Tokenize();
         
         var parser = new TextParser(tokens);
-        var nodes = parser.Parse();
+        return parser.Parse();
 
-        return HtmlRenderer.Render(nodes).Replace("\r", "");
     }
 }

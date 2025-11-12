@@ -7,9 +7,9 @@ public class TextParser(List<Token> tokens)
     private Token Current => pos < tokens.Count ? tokens[pos] : Token.EndOfFile();
     private void Advance() => pos++;
 
-    public List<Node> Parse()
+    public string Parse()
     {
-        var nodes = new List<Node>();
+        var document = new DocumentNode();
 
         while (Current.Type != TokenType.EndOfFile)//пока не токен с концом
         {
@@ -28,13 +28,14 @@ public class TextParser(List<Token> tokens)
 
             Node blockNode = isHeading ? new HeadingNode(level) : new ParagraphNode();// создаём заголовок или параграф
             blockNode.Children.AddRange(contentNodes);// добавляем в дети узлы содержимого
-            nodes.Add(blockNode);//добавляем в общий список узлов уже заполненный заголовок или параграф
+            document.Children.Add(blockNode);//добавляем в общий список узлов уже заполненный заголовок или параграф
 
             if (Current.Type == TokenType.NewLine)
                 Advance();
         }
 
-        return nodes;//вернули список узлов
+        
+        return document.ConvertToHtml();//вернули список узлов
 
         int GetHeadingLevel()
         {

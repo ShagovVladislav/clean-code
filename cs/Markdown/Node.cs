@@ -15,7 +15,15 @@
         }
     }
 
+    public class DocumentNode() : Node
+    {
+        protected override string Tag => string.Empty;
 
+        public override string ConvertToHtml()
+        {
+            return string.Join("\n", Children.Select(c => c.ConvertToHtml()));
+        }
+    }
     public class HeadingNode(int level) : Node
     {
         private int Level { get; } = Math.Clamp(level, MinLevel, MaxLevel);
