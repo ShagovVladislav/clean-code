@@ -44,6 +44,17 @@ public class Tokenizer()
                     ParseUnderscore(ref italicOpen, ref boldOpen, tokens);
                     continue;
                 }
+                case '-':
+                case '*':
+                case '+': 
+                {
+                    if (IsListItemStart())
+                    {
+                        ParseListItem(tokens);
+                        continue;
+                    }
+                    break;
+                }
             }
 
             ParseText(tokens);
@@ -52,7 +63,46 @@ public class Tokenizer()
         tokens.Add(Token.EndOfFile());
         return ConvertUnmatchedTokensToText(tokens);
     }
+    private bool IsListItemStart()
+    {
+        if (position > 0 && text[position - 1] != '\n' && text[position - 1] != '\r')
+            return false;
 
+        return Next == ' ';
+    }
+
+    private void ParseListItem(List<Token> tokens)
+    {
+        var marker = Current; 
+        
+        Advance(2); 
+
+        tokens.Add(Token.ListItem());
+
+        var contentStart = position;
+        while (!Eof && Current != '\n' && Current != '\r')
+            Advance();
+
+        if (position > contentStart)
+        {
+            var content = text[contentStart..position];
+            var contentTokens = TokenizeListItemContent(content);
+            tokens.AddRange(contentTokens);
+        }
+
+        if (!Eof && Current is '\n' or '\r')
+        {
+            ParseNewLine(tokens);
+        }
+    }
+
+    private List<Token> TokenizeListItemContent(string content)
+    {
+        var tempTokenizer = new Tokenizer();
+        var tokens = tempTokenizer.Tokenize(content);
+        
+        return tokens.Where(t => t.Type != TokenType.EndOfFile).ToList();
+    }
     private void ParseUnderscore(ref bool italicOpen, ref bool boldOpen, List<Token> tokens)
     {
         var firstEscaped = position > 0 && text[position - 1] == '\\';

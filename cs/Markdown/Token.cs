@@ -5,7 +5,7 @@
         public TokenType Type { get; }
         public string Value { get; }
 
-        private Token(TokenType type, string value = "")
+        public Token(TokenType type, string value = "")
         {
             Type = type;
             Value = value;
@@ -18,6 +18,9 @@
         public static Token ItalicEnd() => new(TokenType.ItalicEnd, "_");
         public static Token Text(string v) => new(TokenType.Text, v);
         public static Token NewLine() => new(TokenType.NewLine, "\n");
+        public static Token ListStart() => new(TokenType.ListStart, "-"); 
+        public static Token ListItem() => new(TokenType.ListItem, "-"); 
+        public static Token ListEnd() => new(TokenType.ListEnd, "-");
         public static Token EndOfFile() => new(TokenType.EndOfFile);
         
         public override string ToString() => $"{Type}: {Value}";

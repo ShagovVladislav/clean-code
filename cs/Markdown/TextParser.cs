@@ -20,21 +20,29 @@ public class TextParser()
                 continue;
             }
 
-            var isHeading = Current.Type == TokenType.Heading;
-            var level = 0;
-            if (isHeading)
-                level = GetHeadingLevel();
+            if (Current.Type == TokenType.ListItem)
+            {
+                var listNode = ParseList();
+                document.Children.Add(listNode);
+            }
+            else
+            {
+                var isHeading = Current.Type == TokenType.Heading;
+                var level = 0;
+                if (isHeading)
+                    level = GetHeadingLevel();
 
-            var contentNodes = ParseInlineElements();
+                var contentNodes = ParseInlineElements();
 
-            Node blockNode = isHeading ? new HeadingNode(level) : new ParagraphNode();
-            blockNode.Children.AddRange(contentNodes);
-            document.Children.Add(blockNode);
+                Node blockNode = isHeading ? new HeadingNode(level) : new ParagraphNode();
+                blockNode.Children.AddRange(contentNodes);
+                document.Children.Add(blockNode);
 
-            if (Current.Type == TokenType.NewLine)
-                Advance();
+                if (Current.Type == TokenType.NewLine)
+                    Advance();
+            }
         }
-        
+
         return document.ConvertToHtml();
 
         int GetHeadingLevel()
@@ -46,6 +54,34 @@ public class TextParser()
         }
     }
 
+    private ListNode ParseList()
+    {
+        var listNode = new ListNode();
+
+        while (Current.Type == TokenType.ListItem)
+        {
+            var listItemNode = ParseListItem();
+            listNode.Children.Add(listItemNode);
+        }
+
+        return listNode;
+    }
+
+    private ListItemNode ParseListItem()
+    {
+        Advance();
+
+        var listItemNode = new ListItemNode();
+        var contentNodes = ParseInlineElements();
+
+        listItemNode.Children.AddRange(contentNodes);
+
+        if (Current.Type == TokenType.NewLine)
+            Advance();
+
+        return listItemNode;
+    }
+
     private List<Node> ParseInlineElements()
     {
         var contentNodes = new List<Node>();
@@ -55,17 +91,19 @@ public class TextParser()
             switch (Current.Type)
             {
                 case TokenType.BoldStart:
-                    contentNodes.Add(ParseStyledNode(TokenType.BoldStart, 
+                    contentNodes.Add(ParseStyledNode(TokenType.BoldStart,
                         innerNodes => new BoldNode { Children = innerNodes }));
                     break;
                 case TokenType.ItalicStart:
-                    contentNodes.Add(ParseStyledNode(TokenType.ItalicStart, 
+                    contentNodes.Add(ParseStyledNode(TokenType.ItalicStart,
                         innerNodes => new ItalicNode { Children = innerNodes }));
                     break;
                 case TokenType.Text:
                     contentNodes.Add(new TextNode(Current.Value));
                     Advance();
                     break;
+                case TokenType.ListItem:
+                    return contentNodes;
                 default:
                     Advance();
                     break;
@@ -87,7 +125,8 @@ public class TextParser()
         Advance();
         var inner = new List<Node>();
 
-        while (Current.Type != TokenType.EndOfFile && Current.Type != endType && Current.Type != TokenType.NewLine)
+        while (Current.Type != TokenType.EndOfFile && Current.Type != endType &&
+               Current.Type != TokenType.NewLine && Current.Type != TokenType.ListItem)
         {
             switch (Current.Type)
             {
@@ -108,13 +147,15 @@ public class TextParser()
         }
 
         if (Current.Type == endType)
-            Advance(); 
+            Advance();
 
         return factory(inner);
     }
 
     private bool HasContent()
     {
-        return Current.Type != TokenType.NewLine && Current.Type != TokenType.EndOfFile;
+        return Current.Type != TokenType.NewLine &&
+               Current.Type != TokenType.EndOfFile &&
+               Current.Type != TokenType.ListItem;
     }
 }

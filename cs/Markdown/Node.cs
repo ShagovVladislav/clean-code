@@ -25,6 +25,16 @@
         }
     }
 
+    public class ListNode : Node
+    {
+        protected override string Tag => "ul";
+    }
+
+    public class ListItemNode : Node
+    {
+        protected override string Tag => "li";
+    }
+
     public class HeadingNode(int level) : Node
     {
         private int Level { get; } = Math.Clamp(level, MinLevel, MaxLevel);

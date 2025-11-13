@@ -9,5 +9,8 @@ public enum TokenType
     ItalicEnd,
     Text,
     NewLine,
+    ListStart,
+    ListItem,
+    ListEnd,
     EndOfFile
 }
