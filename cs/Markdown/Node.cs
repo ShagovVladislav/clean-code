@@ -24,6 +24,7 @@
             return string.Join("\n", Children.Select(c => c.ConvertToHtml()));
         }
     }
+
     public class HeadingNode(int level) : Node
     {
         private int Level { get; } = Math.Clamp(level, MinLevel, MaxLevel);
@@ -43,12 +44,10 @@
         protected override string Tag => "em";
     }
 
- 
     public class BoldNode : Node
     {
         protected override string Tag => "strong";
     }
-
 
     public class TextNode(string content) : Node
     {

@@ -1,14 +1,16 @@
 ﻿namespace Markdown;
 
-public class TextParser(List<Token> tokens)
+public class TextParser()
 {
     private int pos;
-
+    private List<Token> tokens = null!;
     private Token Current => pos < tokens.Count ? tokens[pos] : Token.EndOfFile();
     private void Advance() => pos++;
 
-    public string Parse()
+    public string Parse(List<Token> tokensList)
     {
+        tokens = tokensList;
+        pos = 0;
         var document = new DocumentNode();
 
         while (Current.Type != TokenType.EndOfFile)

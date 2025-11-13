@@ -1,8 +1,9 @@
 ﻿namespace Markdown;
 
-public class Tokenizer(string text)
+public class Tokenizer()
 {
     private int position;
+    private string text = string.Empty;
 
     private char Current => position < text.Length ? text[position] : '\0';
     private char Next => position + 1 < text.Length ? text[position + 1] : '\0';
@@ -10,8 +11,10 @@ public class Tokenizer(string text)
 
     private void Advance(int count = 1) => position += count;
 
-    public List<Token> Tokenize()
+    public List<Token> Tokenize(string markdownText)
     {
+        text = markdownText;
+        position = 0;
         var tokens = new List<Token>();
         var italicOpen = false;
         var boldOpen = false;
@@ -50,7 +53,7 @@ public class Tokenizer(string text)
         return ConvertUnmatchedTokensToText(tokens);
     }
 
-    private void ParseUnderscore(ref bool italicOpen,ref bool boldOpen, List<Token> tokens)
+    private void ParseUnderscore(ref bool italicOpen, ref bool boldOpen, List<Token> tokens)
     {
         var firstEscaped = position > 0 && text[position - 1] == '\\';
 
@@ -71,16 +74,18 @@ public class Tokenizer(string text)
         Advance();
     }
 
-    private bool HandleUnderscoreEdgeCases(bool italicOpen, bool boldOpen, List<Token> tokens, bool firstEscaped, ref int count,
+    private bool HandleUnderscoreEdgeCases(bool italicOpen, bool boldOpen, List<Token> tokens, bool firstEscaped,
+        ref int count,
         ref int start)
     {
-        if (Next == ' ' && !italicOpen && count == 1 || 
+        if (Next == ' ' && !italicOpen && count == 1 ||
             Next == ' ' && !boldOpen && count == 2)
         {
             tokens.Add(Token.Text("_"));
             Advance();
             return true;
         }
+
         if (firstEscaped)
         {
             tokens.Add(Token.Text("_"));
@@ -98,13 +103,13 @@ public class Tokenizer(string text)
     {
         var toAdd = kind switch
         {
-            EmphasisType.ItalicStart     => new[] { Token.ItalicStart() },
-            EmphasisType.ItalicEnd       => new[] { Token.ItalicEnd() },
-            EmphasisType.BoldStart       => new[] { Token.BoldStart() },
-            EmphasisType.BoldEnd         => new[] { Token.BoldEnd() },
+            EmphasisType.ItalicStart => new[] { Token.ItalicStart() },
+            EmphasisType.ItalicEnd => new[] { Token.ItalicEnd() },
+            EmphasisType.BoldStart => new[] { Token.BoldStart() },
+            EmphasisType.BoldEnd => new[] { Token.BoldEnd() },
             EmphasisType.BoldItalicStart => new[] { Token.BoldStart(), Token.ItalicStart() },
-            EmphasisType.BoldItalicEnd   => new[] { Token.ItalicEnd(), Token.BoldEnd() },
-            _                            => new[] { Token.Text(new string('_', count)) }
+            EmphasisType.BoldItalicEnd => new[] { Token.ItalicEnd(), Token.BoldEnd() },
+            _ => new[] { Token.Text(new string('_', count)) }
         };
 
         tokens.AddRange(toAdd);
@@ -143,6 +148,7 @@ public class Tokenizer(string text)
             Advance();
             return;
         }
+
         var start = position;
         while (Current == '#')
             Advance();
@@ -150,142 +156,146 @@ public class Tokenizer(string text)
     }
 
     private static EmphasisType AnalyzeUnderscore(string text, int position, int underscoreCount,
-    ref bool italicOpen, ref bool boldOpen)
-{
-    var prevChar = GetChar(text, position - 1);
-    var nextChar = GetChar(text, position + underscoreCount);
-
-    var prevIsLetter = char.IsLetter(prevChar);
-    var nextIsLetter = char.IsLetter(nextChar);
-    var prevIsDigit = char.IsDigit(prevChar);
-    var nextIsDigit = char.IsDigit(nextChar);
-    var prevIsSpace = IsWhitespaceOrStart(text, position - 1);
-    var nextIsSpace = IsWhitespaceOrEnd(text, position + underscoreCount);
-    var prevIsPunct = char.IsPunctuation(prevChar);
-    var nextIsPunct = char.IsPunctuation(nextChar);
-
-    if (IsInvalidInnerUnderscore(text, position, underscoreCount, prevIsLetter, nextIsLetter) || prevIsDigit || nextIsDigit)
-        return EmphasisType.None;
-
-    return underscoreCount switch
+        ref bool italicOpen, ref bool boldOpen)
     {
-        1 => AnalyzeSingleUnderscore(prevIsLetter, prevIsPunct, prevIsSpace,
-            nextIsLetter, nextIsSpace, nextIsPunct,
-            ref italicOpen),
+        var prevChar = GetChar(text, position - 1);
+        var nextChar = GetChar(text, position + underscoreCount);
 
-        2 => AnalyzeDoubleUnderscore(prevIsSpace, prevIsPunct, prevChar,
-            nextIsLetter, nextIsSpace, nextIsPunct,
-            ref boldOpen),
+        var prevIsLetter = char.IsLetter(prevChar);
+        var nextIsLetter = char.IsLetter(nextChar);
+        var prevIsDigit = char.IsDigit(prevChar);
+        var nextIsDigit = char.IsDigit(nextChar);
+        var prevIsSpace = IsWhitespaceOrStart(text, position - 1);
+        var nextIsSpace = IsWhitespaceOrEnd(text, position + underscoreCount);
+        var prevIsPunct = char.IsPunctuation(prevChar);
+        var nextIsPunct = char.IsPunctuation(nextChar);
 
-        3 => AnalyzeTripleUnderscore(prevIsSpace, prevIsPunct,
-            nextIsSpace, nextChar),
+        if (IsInvalidInnerUnderscore(text, position, underscoreCount, prevIsLetter, nextIsLetter) || prevIsDigit ||
+            nextIsDigit)
+            return EmphasisType.None;
 
-        _ => EmphasisType.None
-    };
-}
-
-private static char GetChar(string text, int index) =>
-    index >= 0 && index < text.Length ? text[index] : '\0';
-
-private static bool IsWhitespaceOrStart(string text, int index) =>
-    index < 0 || char.IsWhiteSpace(GetChar(text, index));
-
-private static bool IsWhitespaceOrEnd(string text, int index) =>
-    index >= text.Length || char.IsWhiteSpace(GetChar(text, index));
-
-private static bool IsInvalidInnerUnderscore(string text, int pos, int count, bool prevIsLetter, bool nextIsLetter)
-{
-    if (!(prevIsLetter && nextIsLetter))
-        return false;
-
-    var searchPos = pos + count;
-    var foundWhitespace = false;
-
-    while (searchPos < text.Length)
-    {
-        var current = text[searchPos];
-        if (current == ' ') foundWhitespace = true;
-        if (current == '_')
+        return underscoreCount switch
         {
-            if (foundWhitespace && IsLetterSurrounded(text, searchPos))
-                return true;
-            break;
+            1 => AnalyzeSingleUnderscore(prevIsLetter, prevIsPunct, prevIsSpace,
+                nextIsLetter, nextIsSpace, nextIsPunct,
+                ref italicOpen),
+
+            2 => AnalyzeDoubleUnderscore(prevIsSpace, prevIsPunct, prevChar,
+                nextIsLetter, nextIsSpace, nextIsPunct,
+                ref boldOpen),
+
+            3 => AnalyzeTripleUnderscore(prevIsSpace, prevIsPunct,
+                nextIsSpace, nextChar),
+
+            _ => EmphasisType.None
+        };
+    }
+
+    private static char GetChar(string text, int index) =>
+        index >= 0 && index < text.Length ? text[index] : '\0';
+
+    private static bool IsWhitespaceOrStart(string text, int index) =>
+        index < 0 || char.IsWhiteSpace(GetChar(text, index));
+
+    private static bool IsWhitespaceOrEnd(string text, int index) =>
+        index >= text.Length || char.IsWhiteSpace(GetChar(text, index));
+
+    private static bool IsInvalidInnerUnderscore(string text, int pos, int count, bool prevIsLetter, bool nextIsLetter)
+    {
+        if (!(prevIsLetter && nextIsLetter))
+            return false;
+
+        var searchPos = pos + count;
+        var foundWhitespace = false;
+
+        while (searchPos < text.Length)
+        {
+            var current = text[searchPos];
+            if (current == ' ') foundWhitespace = true;
+            if (current == '_')
+            {
+                if (foundWhitespace && IsLetterSurrounded(text, searchPos))
+                    return true;
+                break;
+            }
+
+            searchPos++;
         }
-        searchPos++;
-    }
-    return false;
-}
 
-private static bool IsLetterSurrounded(string text, int index)
-{
-    var before = GetChar(text, index - 1);
-    var after = GetChar(text, index + 1);
-    return char.IsLetter(before) && char.IsLetter(after);
-}
-
-private static EmphasisType AnalyzeSingleUnderscore(
-    bool prevIsLetter, bool prevIsPunct, bool prevIsSpace,
-    bool nextIsLetter, bool nextIsSpace, bool nextIsPunct,
-    ref bool italicOpen)
-{
-    if (prevIsLetter || (prevIsPunct && nextIsLetter))
-    {
-        italicOpen = !italicOpen;
-        return italicOpen ? EmphasisType.ItalicStart : EmphasisType.ItalicEnd;
+        return false;
     }
 
-    if ((prevIsSpace || prevIsPunct) && nextIsLetter)
+    private static bool IsLetterSurrounded(string text, int index)
     {
-        italicOpen = true;
-        return EmphasisType.ItalicStart;
+        var before = GetChar(text, index - 1);
+        var after = GetChar(text, index + 1);
+        return char.IsLetter(before) && char.IsLetter(after);
     }
 
-    if (!prevIsLetter || (!nextIsSpace && !nextIsPunct))
-        return EmphasisType.None;
-
-    italicOpen = false;
-    return EmphasisType.ItalicEnd;
-}
-
-private static EmphasisType AnalyzeDoubleUnderscore(
-    bool prevIsSpace, bool prevIsPunct, char prevChar,
-    bool nextIsLetter, bool nextIsSpace, bool nextIsPunct,
-    ref bool boldOpen)
-{
-    if ((prevIsSpace || prevIsPunct || prevChar == '\0') && nextIsLetter && !boldOpen)
+    private static EmphasisType AnalyzeSingleUnderscore(
+        bool prevIsLetter, bool prevIsPunct, bool prevIsSpace,
+        bool nextIsLetter, bool nextIsSpace, bool nextIsPunct,
+        ref bool italicOpen)
     {
-        boldOpen = true;
-        return EmphasisType.BoldStart;
+        if (prevIsLetter || (prevIsPunct && nextIsLetter))
+        {
+            italicOpen = !italicOpen;
+            return italicOpen ? EmphasisType.ItalicStart : EmphasisType.ItalicEnd;
+        }
+
+        if ((prevIsSpace || prevIsPunct) && nextIsLetter)
+        {
+            italicOpen = true;
+            return EmphasisType.ItalicStart;
+        }
+
+        if (!prevIsLetter || (!nextIsSpace && !nextIsPunct))
+            return EmphasisType.None;
+
+        italicOpen = false;
+        return EmphasisType.ItalicEnd;
     }
 
-    if (!boldOpen || (nextIsLetter && !nextIsSpace && !nextIsPunct))
-        return EmphasisType.None;
-
-    boldOpen = false;
-    return EmphasisType.BoldEnd;
-}
-private static EmphasisType AnalyzeTripleUnderscore(
-    bool prevIsSpace, bool prevIsPunct,
-    bool nextIsSpace, char nextChar)
-{
-    var canOpen = !nextIsSpace && nextChar != '\0';
-    var canClose = !prevIsSpace && !prevIsPunct;
-
-    return canOpen switch
+    private static EmphasisType AnalyzeDoubleUnderscore(
+        bool prevIsSpace, bool prevIsPunct, char prevChar,
+        bool nextIsLetter, bool nextIsSpace, bool nextIsPunct,
+        ref bool boldOpen)
     {
-        true when !canClose => EmphasisType.BoldItalicStart,
-        false when canClose => EmphasisType.BoldItalicEnd,
-        _ => EmphasisType.None
-    };
-}
-    
-    
-private static List<Token> ConvertUnmatchedTokensToText(List<Token> tokens)
-{
-    var invalidIndices = FindInvalidTokenIndices(tokens);
-    return ReplaceInvalidTokensWithText(tokens, invalidIndices);
-}
-    
+        if ((prevIsSpace || prevIsPunct || prevChar == '\0') && nextIsLetter && !boldOpen)
+        {
+            boldOpen = true;
+            return EmphasisType.BoldStart;
+        }
+
+        if (!boldOpen || (nextIsLetter && !nextIsSpace && !nextIsPunct))
+            return EmphasisType.None;
+
+        boldOpen = false;
+        return EmphasisType.BoldEnd;
+    }
+
+    private static EmphasisType AnalyzeTripleUnderscore(
+        bool prevIsSpace, bool prevIsPunct,
+        bool nextIsSpace, char nextChar)
+    {
+        var canOpen = !nextIsSpace && nextChar != '\0';
+        var canClose = !prevIsSpace && !prevIsPunct;
+
+        return canOpen switch
+        {
+            true when !canClose => EmphasisType.BoldItalicStart,
+            false when canClose => EmphasisType.BoldItalicEnd,
+            _ => EmphasisType.None
+        };
+    }
+
+
+    private static List<Token> ConvertUnmatchedTokensToText(List<Token> tokens)
+    {
+        var invalidIndices = FindInvalidTokenIndices(tokens);
+        return ReplaceInvalidTokensWithText(tokens, invalidIndices);
+    }
+
     private static HashSet<int> FindInvalidTokenIndices(List<Token> tokens)
     {
         var invalid = new HashSet<int>();
@@ -306,7 +316,7 @@ private static List<Token> ConvertUnmatchedTokensToText(List<Token> tokens)
 
         return invalid;
     }
-    
+
     private static List<Token> ReplaceInvalidTokensWithText(List<Token> tokens, HashSet<int> invalidIndices)
     {
         return tokens
@@ -314,37 +324,38 @@ private static List<Token> ConvertUnmatchedTokensToText(List<Token> tokens)
             .ToList();
     }
 
-        private static Stack<(Token token, int index)> FindUnpairedTokens(List<Token> list, HashSet<int> hashSet)
+    private static Stack<(Token token, int index)> FindUnpairedTokens(List<Token> list, HashSet<int> hashSet)
+    {
+        var valueTuples = new Stack<(Token token, int index)>();
+
+        for (var i = 0; i < list.Count; i++)
         {
-            var valueTuples = new Stack<(Token token, int index)>();
+            if (hashSet.Contains(i)) continue;
 
-            for (var i = 0; i < list.Count; i++)
+            var token = list[i];
+
+            switch (token.Type)
             {
-                if (hashSet.Contains(i)) continue;
+                case TokenType.BoldStart:
+                case TokenType.ItalicStart:
+                    valueTuples.Push((token, i));
+                    break;
 
-                var token = list[i];
-
-                switch (token.Type)
-                {
-                    case TokenType.BoldStart:
-                    case TokenType.ItalicStart:
-                        valueTuples.Push((token, i));
-                        break;
-
-                    case TokenType.BoldEnd:
-                    case TokenType.ItalicEnd:
-                        if (valueTuples.Count == 0 || !IsMatching(valueTuples.Peek().token, token))
-                            hashSet.Add(i);
-                        else
-                            valueTuples.Pop();
-                        break;
-                }
+                case TokenType.BoldEnd:
+                case TokenType.ItalicEnd:
+                    if (valueTuples.Count == 0 || !IsMatching(valueTuples.Peek().token, token))
+                        hashSet.Add(i);
+                    else
+                        valueTuples.Pop();
+                    break;
             }
-
-            return valueTuples;
         }
 
-    private static List<(int start, int end)> FindValidTagPairs(List<Token> tokens, TokenType startType, TokenType endType)
+        return valueTuples;
+    }
+
+    private static List<(int start, int end)> FindValidTagPairs(List<Token> tokens, TokenType startType,
+        TokenType endType)
     {
         var pairs = new List<(int start, int end)>();
         var stack = new Stack<int>();

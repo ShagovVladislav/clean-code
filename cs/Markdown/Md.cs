@@ -2,13 +2,12 @@
 
 public static class Md
 {
+    private static readonly Tokenizer Tokenizer = new();
+    private static readonly TextParser Parser = new();
     public static string ToHtml(string markdownText)
     {
-        var tokenizer = new Tokenizer(markdownText);
-        var tokens = tokenizer.Tokenize();
+        var tokens = Tokenizer.Tokenize(markdownText);
         
-        var parser = new TextParser(tokens);
-        return parser.Parse();
-
+        return Parser.Parse(tokens);
     }
 }
