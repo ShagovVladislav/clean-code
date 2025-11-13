@@ -11,31 +11,29 @@ public class TextParser(List<Token> tokens)
     {
         var document = new DocumentNode();
 
-        while (Current.Type != TokenType.EndOfFile)//пока не токен с концом
+        while (Current.Type != TokenType.EndOfFile)
         {
-            if (Current.Type == TokenType.NewLine)//если перенос - скип
+            if (Current.Type == TokenType.NewLine)
             {
-                Advance();
                 continue;
             }
 
-            var isHeading = Current.Type == TokenType.Heading;//это заголовок?
-            var level = 0;//ур заголовка
+            var isHeading = Current.Type == TokenType.Heading;
+            var level = 0;
             if (isHeading)
-                level = GetHeadingLevel();//получаем уровень если это заголовок
+                level = GetHeadingLevel();
 
-            var contentNodes = ParseInlineElements();//получаем содержимое заголовка или параграфа
+            var contentNodes = ParseInlineElements();
 
-            Node blockNode = isHeading ? new HeadingNode(level) : new ParagraphNode();// создаём заголовок или параграф
-            blockNode.Children.AddRange(contentNodes);// добавляем в дети узлы содержимого
-            document.Children.Add(blockNode);//добавляем в общий список узлов уже заполненный заголовок или параграф
+            Node blockNode = isHeading ? new HeadingNode(level) : new ParagraphNode();
+            blockNode.Children.AddRange(contentNodes);
+            document.Children.Add(blockNode);
 
             if (Current.Type == TokenType.NewLine)
                 Advance();
         }
-
         
-        return document.ConvertToHtml();//вернули список узлов
+        return document.ConvertToHtml();
 
         int GetHeadingLevel()
         {
@@ -46,9 +44,9 @@ public class TextParser(List<Token> tokens)
         }
     }
 
-    private List<Node> ParseInlineElements()//парсинг всех bold, italic etc
+    private List<Node> ParseInlineElements()
     {
-        var contentNodes = new List<Node>();//список внутренних нод
+        var contentNodes = new List<Node>();
 
         while (HasContent())
         {
@@ -77,20 +75,12 @@ public class TextParser(List<Token> tokens)
 
     private Node ParseStyledNode(TokenType startType, Func<List<Node>, Node> factory)
     {
-        
-        TokenType endType;
-        switch (startType)
+        var endType = startType switch
         {
-            case TokenType.ItalicStart:
-                endType = TokenType.ItalicEnd;
-                break;
-            case TokenType.BoldStart:
-                endType = TokenType.BoldEnd;
-                break;
-            default: 
-                endType = startType;
-                break;
-        }
+            TokenType.ItalicStart => TokenType.ItalicEnd,
+            TokenType.BoldStart => TokenType.BoldEnd,
+            _ => startType
+        };
 
         Advance();
         var inner = new List<Node>();
