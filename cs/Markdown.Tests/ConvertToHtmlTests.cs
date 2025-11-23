@@ -3,147 +3,10 @@
 namespace Markdown.Tests;
 
 [TestFixture]
-public class ConvertToHtmlTests()
+public class ConvertToHtmlTests
 {
-    [Test]
-    public void ConvertToHtml_ShouldParseBulletList_WhenStartsWithDash()
-    {
-        var text = "- Item 1\n- Item 2\n- Item 3";
-        
-        var content = Md.ConvertToHtml(text);
+    #region Heading Tests
     
-        content.Should().Be("<ul><li>Item 1</li><li>Item 2</li><li>Item 3</li></ul>");
-    }
-    
-    [Test]
-    public void ConvertToHtml_ShouldParseBulletList_WhenStartsWithAsterisk()
-    {
-        var text = "* Item 1\n* Item 2\n* Item 3";
-        
-        var content = Md.ConvertToHtml(text);
-    
-        content.Should().Be("<ul><li>Item 1</li><li>Item 2</li><li>Item 3</li></ul>");
-    }
-    
-    [Test]
-    public void ConvertToHtml_ShouldParseBulletList_WhenStartsWithPlus()
-    {
-        var text = "+ Item 1\n+ Item 2\n+ Item 3";
-        
-        var content = Md.ConvertToHtml(text);
-    
-        content.Should().Be("<ul><li>Item 1</li><li>Item 2</li><li>Item 3</li></ul>");
-    }
-    
-    [Test]
-    public void ConvertToHtml_ShouldParseSingleListItem_WhenOnlyOneItem()
-    {
-        var text = "- Single item";
-        
-        var content = Md.ConvertToHtml(text);
-    
-        content.Should().Be("<ul><li>Single item</li></ul>");
-    }
-    
-    [Test]
-    public void ConvertToHtml_ShouldParseListWithFormatting_WhenItemsHaveEmphasis()
-    {
-        var text = "- _italic item_\n- __bold item__\n- ___bold italic___";
-        
-        var content = Md.ConvertToHtml(text);
-    
-        content.Should().Be("<ul><li><em>italic item</em></li><li><strong>bold item</strong></li><li><strong><em>bold italic</em></strong></li></ul>");
-    }
-    
-    [Test]
-    public void ConvertToHtml_ShouldParseMixedContent_WhenListAndParagraphs()
-    {
-        var text = "Paragraph before\n- List item 1\n- List item 2\nParagraph after";
-        
-        var content = Md.ConvertToHtml(text);
-    
-        content.Should().Be("<p>Paragraph before</p>\n<ul><li>List item 1</li><li>List item 2</li></ul>\n<p>Paragraph after</p>");
-    }
-    
-    [Test]
-    public void ConvertToHtml_ShouldNotParseAsList_WhenNoSpaceAfterMarker()
-    {
-        var text = "-no space item";
-        
-        var content = Md.ConvertToHtml(text);
-    
-        content.Should().Be("<p>-no space item</p>");
-    }
-    
-    [Test]
-    public void ConvertToHtml_ShouldNotParseAsList_WhenMarkerInMiddleOfLine()
-    {
-        var text = "Text with - dash in middle";
-        
-        var content = Md.ConvertToHtml(text);
-    
-        content.Should().Be("<p>Text with - dash in middle</p>");
-    }
-    
-    [Test]
-    public void ConvertToHtml_ShouldNotParseEmptyListItem_WhenNoContentAfterMarker()
-    {
-        var text = "-\n- Item 2";
-    
-        var content = Md.ConvertToHtml(text);
-
-        content.Should().Be("<p>-</p>\n<ul><li>Item 2</li></ul>");
-    }
-    
-    [Test]
-    public void ConvertToHtml_ShouldParseListWithMultipleParagraphs_WhenMixedContent()
-    {
-        var text = "# Heading\n- List item\nParagraph text\n- Another item";
-        
-        var content = Md.ConvertToHtml(text);
-    
-        content.Should().Be("<h1> Heading</h1>\n<ul><li>List item</li></ul>\n<p>Paragraph text</p>\n<ul><li>Another item</li></ul>");
-    }
-    
-    [Test]
-    public void ConvertToHtml_ShouldParseComplexListItem_WhenMultipleFormattings()
-    {
-        var text = "- Start with __bold__ and _italic_ and end";
-        
-        var content = Md.ConvertToHtml(text);
-    
-        content.Should().Be("<ul><li>Start with <strong>bold</strong> and <em>italic</em> and end</li></ul>");
-    }
-    
-    [Test]
-    public void ConvertToHtml_ShouldParseListAfterHeading_WhenCombined()
-    {
-        var text = "# My List\n- First item\n- Second item";
-        
-        var content = Md.ConvertToHtml(text);
-    
-        content.Should().Be("<h1> My List</h1>\n<ul><li>First item</li><li>Second item</li></ul>");
-    }
-    
-    [Test]
-    public void ConvertToHtml_ShouldNotParseEscapedMarker_WhenBackslashBefore()
-    {
-        var text = "\\- Not a list item";
-        
-        var content = Md.ConvertToHtml(text);
-    
-        content.Should().Be("<p>- Not a list item</p>");
-    }
-    
-    [Test]
-    public void ConvertToHtml_ShouldParseMultipleLists_WhenSeparatedByContent()
-    {
-        var text = "- List A1\n- List A2\nParagraph\n- List B1\n- List B2";
-        
-        var content = Md.ConvertToHtml(text);
-    
-        content.Should().Be("<ul><li>List A1</li><li>List A2</li></ul>\n<p>Paragraph</p>\n<ul><li>List B1</li><li>List B2</li></ul>");
-    }
     [Test]
     public void ConvertToHtml_ShouldParseHeading_WhenStartWithOctothorpe()
     {
@@ -159,12 +22,41 @@ public class ConvertToHtmlTests()
     [TestCase("##Heading", "<h2>Heading</h2>")]
     [TestCase("###Heading", "<h3>Heading</h3>")]
     [TestCase("####Heading", "<h4>Heading</h4>")]
+    [TestCase("#########Heading", "<h6>###Heading</h6>")]
+    [TestCase("#########", "<h6>###</h6>")]
+    [TestCase(@"\##Heading", "<p>##Heading</p>")]
     public void ConvertToHtml_ShouldParseDifferentLevelHeading_WhenStartWithOctothorpe(string text, string expected)
     {
         var content = Md.ConvertToHtml(text);
         
         content.Should().Be(expected);
     }
+    
+    [Test]
+    [TestCase(@"\#Heading", "<p>#Heading</p>")]
+    [TestCase(@"\##Heading", "<p>##Heading</p>")]
+    [TestCase(@"\###Heading", "<p>###Heading</p>")]
+    public void ConvertToHtml_ShouldEscapeAllHashes_WhenBackslashBefore(string text, string expected)
+    {
+        var content = Md.ConvertToHtml(text);
+        content.Should().Be(expected);
+    }
+    
+    [Test]
+    [TestCase("#_Italic Heading_", "<h1><em>Italic Heading</em></h1>")]
+    [TestCase("#__Bold Heading__", "<h1><strong>Bold Heading</strong></h1>")]
+    [TestCase("##_Italic Heading_", "<h2><em>Italic Heading</em></h2>")]
+    [TestCase("###__Bold Heading__", "<h3><strong>Bold Heading</strong></h3>")]
+    public void ConvertToHtml_ShouldParseHeadingWithFormatting_WhenCombinedWithOctothorpe(string text, string expected)
+    {
+        var content = Md.ConvertToHtml(text);
+        
+        content.Should().Be(expected);
+    }
+
+    #endregion
+
+    #region Basic Formatting Tests
     
     [Test]
     public void ConvertToHtml_ShouldParseItalic_WhenTextWrappedWithUnderscores()
@@ -186,20 +78,6 @@ public class ConvertToHtmlTests()
         content.Should().Be("<p><strong>bold text</strong></p>");
     }
 
-
-
-    [Test]
-    [TestCase("#_Italic Heading_", "<h1><em>Italic Heading</em></h1>")]
-    [TestCase("#__Bold Heading__", "<h1><strong>Bold Heading</strong></h1>")]
-    [TestCase("##_Italic Heading_", "<h2><em>Italic Heading</em></h2>")]
-    [TestCase("###__Bold Heading__", "<h3><strong>Bold Heading</strong></h3>")]
-    public void ConvertToHtml_ShouldParseHeadingWithFormatting_WhenCombinedWithOctothorpe(string text, string expected)
-    {
-        var content = Md.ConvertToHtml(text);
-        
-        content.Should().Be(expected);
-    }
-
     [Test]
     [TestCase("__bold__ and _italic_", "<p><strong>bold</strong> and <em>italic</em></p>")]
     [TestCase("_italic_ and __bold__", "<p><em>italic</em> and <strong>bold</strong></p>")]
@@ -212,6 +90,10 @@ public class ConvertToHtmlTests()
         content.Should().Be(expected);
     }
 
+    #endregion
+
+    #region Nested Formatting Tests
+    
     [Test]
     [TestCase("___bold italic___", "<p><strong><em>bold italic</em></strong></p>")] 
     [TestCase("__bold _with italic_ inside__", "<p><strong>bold <em>with italic</em> inside</strong></p>")]
@@ -232,7 +114,7 @@ public class ConvertToHtmlTests()
         var content = Md.ConvertToHtml(text);
     
         content.Should().Be(expected);
-    }   
+    }
 
     [Test]
     public void ConvertToHtml_ShouldParseComplexCombination_WhenAllElementsPresent()
@@ -243,6 +125,10 @@ public class ConvertToHtmlTests()
     
         content.Should().Be("<h1><strong>Bold Heading</strong> with <em>italic</em> and plain text</h1>");
     }
+
+    #endregion
+
+    #region Edge Cases - Underscore Positioning
     
     [Test]
     public void ConvertToHtml_ShouldNotParseDigits_WhenItalic()
@@ -263,6 +149,7 @@ public class ConvertToHtmlTests()
     
         content.Should().Be("<p><em>St</em>art</p>");
     }
+    
     [Test]
     public void ConvertToHtml_ShouldParse_WhenUnderscoreInDifferentWords()
     {
@@ -272,6 +159,7 @@ public class ConvertToHtmlTests()
     
         content.Should().Be("<p>On_e tw_o</p>");
     }
+    
     [Test]
     public void ConvertToHtml_ShouldParse_WhenUnderscoreInTheMiddleAndTheEnd()
     {
@@ -291,8 +179,33 @@ public class ConvertToHtmlTests()
     
         content.Should().Be("<p>S<em>tar</em>t</p>");
     }
+    
     [Test]
-    public void ConvertToHtml_ShouldNorParse_WhenDifferentUnderscores()
+    public void ConvertToHtml_ShouldParse_WhenThreeUnderscores()
+    {
+        var text = "S_...tar..._t..._";
+        
+        var content = Md.ConvertToHtml(text);
+    
+        content.Should().Be("<p>S<em>...tar...</em>t..._</p>");
+    }
+
+    [Test]
+    public void ConvertToHtml_ShouldParse_WhenThreeUnderscoresWithPoints()
+    {
+        var text = "_._._";
+        
+        var content = Md.ConvertToHtml(text);
+    
+        content.Should().Be("<p><em>.</em>._</p>");
+    }
+    
+    #endregion
+
+    #region Invalid Formatting Tests
+    
+    [Test]
+    public void ConvertToHtml_ShouldNotParse_WhenDifferentUnderscores()
     {
         var text = @"__Start_";
         
@@ -302,7 +215,7 @@ public class ConvertToHtmlTests()
     }
     
     [Test]
-    public void ConvertToHtml_ShouldNorParse_WhenCrossDifferentUnderscores()
+    public void ConvertToHtml_ShouldNotParse_WhenCrossDifferentUnderscores()
     {
         var text = @"__Start _something__ now_";
         
@@ -310,17 +223,19 @@ public class ConvertToHtmlTests()
     
         content.Should().Be("<p>__Start _something__ now_</p>");
     }
+    
     [Test]
-    public void ConvertToHtml_ShouldNorParse_WhenOnlyUnderscores()
+    public void ConvertToHtml_ShouldNotParse_WhenOnlyUnderscores()
     {
-        var text = @"___";
+        var text = @"__ __";
         
         var content = Md.ConvertToHtml(text);
     
-        content.Should().Be("<p>___</p>");
+        content.Should().Be("<p>__ __</p>");
     }
+    
     [Test]
-    public void ConvertToHtml_ShouldNorParse_WhenUnderscoresWithWhitespaceAfterStart()
+    public void ConvertToHtml_ShouldNotParse_WhenUnderscoresWithWhitespaceAfterStart()
     {
         var text = @"Start_ something_ now";
         
@@ -328,8 +243,9 @@ public class ConvertToHtmlTests()
     
         content.Should().Be("<p>Start_ something_ now</p>");
     }
+    
     [Test]
-    public void ConvertToHtml_ShouldNorParse_WhenUnderscoresWithWhitespaceBeforeEnd()
+    public void ConvertToHtml_ShouldNotParse_WhenUnderscoresWithWhitespaceBeforeEnd()
     {
         var text = @"Start _something _now";
         
@@ -337,8 +253,13 @@ public class ConvertToHtmlTests()
     
         content.Should().Be("<p>Start _something _now</p>");
     }
+
+    #endregion
+
+    #region Escaping Tests
+    
     [Test]
-    public void ConvertToHtml_ShouldParse_WhenScreeningUnderscore()
+    public void ConvertToHtml_ShouldParse_WhenEscapingUnderscore()
     {
         var text = @"S\_tar\_t";
         
@@ -346,8 +267,9 @@ public class ConvertToHtmlTests()
     
         content.Should().Be("<p>S_tar_t</p>");
     }
+    
     [Test]
-    public void ConvertToHtml_ShouldParse_WhenScreeningTwoUnderscore()
+    public void ConvertToHtml_ShouldParse_WhenEscapingTwoUnderscores()
     {
         var text = @"S\__tar\__t";
         
@@ -357,7 +279,17 @@ public class ConvertToHtmlTests()
     }
     
     [Test]
-    public void ConvertToHtml_ShouldParse_WhenScreeningOctothorpe()
+    public void ConvertToHtml_ShouldParse_WhenEscapingEscapeAndUnderscore()
+    {
+        var text = @"_Italic Paragraph\\\\_";
+        
+        var content = Md.ConvertToHtml(text);
+    
+        content.Should().Be(@"<p><em>Italic Paragraph\\</em></p>");
+    }
+    
+    [Test]
+    public void ConvertToHtml_ShouldParse_WhenEscapingOctothorpe()
     {
         var text = @"\#Start";
         
@@ -367,7 +299,7 @@ public class ConvertToHtmlTests()
     }
     
     [Test]
-    public void ConvertToHtml_ShouldParse_WhenScreeningSlash()
+    public void ConvertToHtml_ShouldParse_WhenEscapingSlash()
     {
         var text = @"\\Start";
         
@@ -375,4 +307,143 @@ public class ConvertToHtmlTests()
     
         content.Should().Be(@"<p>\Start</p>");
     }
+    
+    [Test]
+    public void ConvertToHtml_ShouldParse_WhenEscapingEvenEscapes()
+    {
+        var text = @"\\\\\\\\";
+        
+        var content = Md.ConvertToHtml(text);
+    
+        content.Should().Be(@"<p>\\\\\\\\</p>");
+    }
+    
+    [Test]
+    public void ConvertToHtml_ShouldParse_WhenEscapingOddEscapes()
+    {
+        var text = @"\\\\\\\\\";
+        
+        var content = Md.ConvertToHtml(text);
+    
+        content.Should().Be(@"<p>\\\\\\\\\</p>");
+    }
+    
+    [Test]
+    public void ConvertToHtml_ShouldParse_WhenEscapingOddEscapesAndANotEscapableChar()
+    {
+        var text = @"\\\\\\\\\A";
+        
+        var content = Md.ConvertToHtml(text);
+    
+        content.Should().Be(@"<p>\\\\\\\\\A</p>");
+    }
+    
+    #endregion
+
+    #region List Tests - Basic Functionality
+    
+    [Test]
+    [TestCase("- Item 1\n- Item 2\n- Item 3", "<ul><li>Item 1</li><li>Item 2</li><li>Item 3</li></ul>")]
+    [TestCase("* Item 1\n* Item 2\n* Item 3", "<ul><li>Item 1</li><li>Item 2</li><li>Item 3</li></ul>")]
+    [TestCase("+ Item 1\n+ Item 2\n+ Item 3", "<ul><li>Item 1</li><li>Item 2</li><li>Item 3</li></ul>")]
+    [TestCase("- Single item", "<ul><li>Single item</li></ul>")]
+    public void ConvertToHtml_ShouldParseBulletLists_WithDifferentMarkers(string text, string expected)
+    {
+        var content = Md.ConvertToHtml(text);
+        content.Should().Be(expected);
+    }
+
+    #endregion
+
+    #region List Tests - Formatting in Lists
+    
+    [Test]
+    public void ConvertToHtml_ShouldParseListWithFormatting_WhenItemsHaveEmphasis()
+    {
+        var text = "- _italic item_\n- __bold item__\n- ___bold italic___";
+        
+        var content = Md.ConvertToHtml(text);
+    
+        content.Should().Be("<ul><li><em>italic item</em></li><li><strong>bold item</strong></li><li><strong><em>bold italic</em></strong></li></ul>");
+    }
+    
+    [Test]
+    public void ConvertToHtml_ShouldParseComplexListItem_WhenMultipleFormattings()
+    {
+        var text = "- Start with __bold__ and _italic_ and end";
+        
+        var content = Md.ConvertToHtml(text);
+    
+        content.Should().Be("<ul><li>Start with <strong>bold</strong> and <em>italic</em> and end</li></ul>");
+    }
+
+    #endregion
+
+    #region List Tests - Invalid Cases
+    
+    [Test]
+    [TestCase("-no space item", "<p>-no space item</p>")]
+    [TestCase("Text with - dash in middle", "<p>Text with - dash in middle</p>")]
+    [TestCase("\\- Not a list item", "<p>- Not a list item</p>")]
+    public void ConvertToHtml_ShouldNotParseAsList_WhenInvalidConditions(string text, string expected)
+    {
+        var content = Md.ConvertToHtml(text);
+        content.Should().Be(expected);
+    }
+    
+    [Test]
+    public void ConvertToHtml_ShouldNotParseEmptyListItem_WhenNoContentAfterMarker()
+    {
+        var text = "-\n- Item 2";
+    
+        var content = Md.ConvertToHtml(text);
+
+        content.Should().Be("<p>-</p>\n<ul><li>Item 2</li></ul>");
+    }
+
+    #endregion
+
+    #region List Tests - Combinations with Other Elements
+    
+    [Test]
+    public void ConvertToHtml_ShouldParseMixedContent_WhenListAndParagraphs()
+    {
+        var text = "Paragraph before\n- List item 1\n- List item 2\nParagraph after";
+        
+        var content = Md.ConvertToHtml(text);
+    
+        content.Should().Be("<p>Paragraph before</p>\n<ul><li>List item 1</li><li>List item 2</li></ul>\n<p>Paragraph after</p>");
+    }
+    
+    [Test]
+    public void ConvertToHtml_ShouldParseListWithMultipleParagraphs_WhenMixedContent()
+    {
+        var text = "# Heading\n- List item\nParagraph text\n- Another item";
+        
+        var content = Md.ConvertToHtml(text);
+    
+        content.Should().Be("<h1> Heading</h1>\n<ul><li>List item</li></ul>\n<p>Paragraph text</p>\n<ul><li>Another item</li></ul>");
+    }
+    
+    [Test]
+    public void ConvertToHtml_ShouldParseListAfterHeading_WhenCombined()
+    {
+        var text = "# My List\n- First item\n- Second item";
+        
+        var content = Md.ConvertToHtml(text);
+    
+        content.Should().Be("<h1> My List</h1>\n<ul><li>First item</li><li>Second item</li></ul>");
+    }
+    
+    [Test]
+    public void ConvertToHtml_ShouldParseMultipleLists_WhenSeparatedByContent()
+    {
+        var text = "- List A1\n- List A2\nParagraph\n- List B1\n- List B2";
+        
+        var content = Md.ConvertToHtml(text);
+    
+        content.Should().Be("<ul><li>List A1</li><li>List A2</li></ul>\n<p>Paragraph</p>\n<ul><li>List B1</li><li>List B2</li></ul>");
+    }
+
+    #endregion
 }

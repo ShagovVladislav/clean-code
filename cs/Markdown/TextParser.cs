@@ -1,6 +1,6 @@
 ﻿namespace Markdown;
 
-public class TextParser()
+public class TextParser
 {
     private int pos;
     private List<Token> tokens = null!;
@@ -15,43 +15,51 @@ public class TextParser()
 
         while (Current.Type != TokenType.EndOfFile)
         {
-            if (Current.Type == TokenType.NewLine)
+            switch (Current.Type)
             {
-                continue;
-            }
-
-            if (Current.Type == TokenType.ListItem)
-            {
-                var listNode = ParseList();
-                document.Children.Add(listNode);
-            }
-            else
-            {
-                var isHeading = Current.Type == TokenType.Heading;
-                var level = 0;
-                if (isHeading)
-                    level = GetHeadingLevel();
-
-                var contentNodes = ParseInlineElements();
-
-                Node blockNode = isHeading ? new HeadingNode(level) : new ParagraphNode();
-                blockNode.Children.AddRange(contentNodes);
-                document.Children.Add(blockNode);
-
-                if (Current.Type == TokenType.NewLine)
-                    Advance();
+                case TokenType.NewLine:
+                    continue;
+                case TokenType.ListItem:
+                {
+                    document.Children.Add(ParseList());
+                    break;
+                }
+                default:
+                    ParseBlockType(document);
+                    break;
             }
         }
 
         return document.ConvertToHtml();
 
-        int GetHeadingLevel()
-        {
-            var hashes = Current.Value;
-            var level = Math.Clamp(hashes.Length, HeadingNode.MinLevel, HeadingNode.MaxLevel);
+    }
+
+    private void ParseBlockType(DocumentNode document)
+    {
+        var isHeading = Current.Type == TokenType.Heading;
+        var level = 0;
+                
+        if (isHeading)
+            level = GetHeadingLevel();
+                
+        var contentNodes = ParseInlineElements();
+
+        Node blockNode = isHeading 
+            ? new HeadingNode(level) 
+            : new ParagraphNode();
+        blockNode.Children.AddRange(contentNodes);
+        document.Children.Add(blockNode);
+
+        if (Current.Type == TokenType.NewLine)
             Advance();
-            return level;
-        }
+    }
+
+    private int GetHeadingLevel()
+    {
+        var hashes = Current.Value;
+        var level = Math.Clamp(hashes.Length, HeadingNode.MinLevel, HeadingNode.MaxLevel);
+        Advance();
+        return level;
     }
 
     private ListNode ParseList()
@@ -71,10 +79,10 @@ public class TextParser()
     {
         Advance();
 
-        var listItemNode = new ListItemNode();
-        var contentNodes = ParseInlineElements();
-
-        listItemNode.Children.AddRange(contentNodes);
+        var listItemNode = new ListItemNode
+        {
+            Children = ParseInlineElements()
+        };
 
         if (Current.Type == TokenType.NewLine)
             Advance();
@@ -115,30 +123,24 @@ public class TextParser()
 
     private Node ParseStyledNode(TokenType startType, Func<List<Node>, Node> factory)
     {
-        var endType = startType switch
-        {
-            TokenType.ItalicStart => TokenType.ItalicEnd,
-            TokenType.BoldStart => TokenType.BoldEnd,
-            _ => startType
-        };
+        var endType = MatchEndType(startType);
 
         Advance();
-        var inner = new List<Node>();
+        var nodes = new List<Node>();
 
-        while (Current.Type != TokenType.EndOfFile && Current.Type != endType &&
-               Current.Type != TokenType.NewLine && Current.Type != TokenType.ListItem)
+        while (CanContinueInlineParsing(endType))
         {
             switch (Current.Type)
             {
                 case TokenType.Text:
-                    inner.Add(new TextNode(Current.Value));
+                    nodes.Add(new TextNode(Current.Value));
                     Advance();
                     break;
                 case TokenType.ItalicStart:
-                    inner.Add(ParseStyledNode(TokenType.ItalicStart, c => new ItalicNode { Children = c }));
+                    nodes.Add(ParseStyledNode(TokenType.ItalicStart, c => new ItalicNode { Children = c }));
                     break;
                 case TokenType.BoldStart:
-                    inner.Add(ParseStyledNode(TokenType.BoldStart, c => new BoldNode { Children = c }));
+                    nodes.Add(ParseStyledNode(TokenType.BoldStart, c => new BoldNode { Children = c }));
                     break;
                 default:
                     Advance();
@@ -146,10 +148,32 @@ public class TextParser()
             }
         }
 
-        if (Current.Type == endType)
+        if (Encounter(endType))
             Advance();
 
-        return factory(inner);
+        return factory(nodes);
+    }
+
+    private bool Encounter(TokenType endType)
+    {
+        return Current.Type == endType;
+    }
+
+    private bool CanContinueInlineParsing(TokenType endType)
+    {
+        return Current.Type != TokenType.EndOfFile && Current.Type != endType &&
+               Current.Type != TokenType.NewLine && Current.Type != TokenType.ListItem;
+    }
+
+    private static TokenType MatchEndType(TokenType startType)
+    {
+        var endType = startType switch
+        {
+            TokenType.ItalicStart => TokenType.ItalicEnd,
+            TokenType.BoldStart => TokenType.BoldEnd,
+            _ => startType
+        };
+        return endType;
     }
 
     private bool HasContent()

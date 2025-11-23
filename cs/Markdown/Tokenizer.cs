@@ -1,12 +1,13 @@
 ﻿namespace Markdown;
 
-public class Tokenizer()
+public class Tokenizer
 {
     private int position;
     private string text = string.Empty;
 
     private char Current => position < text.Length ? text[position] : '\0';
     private char Next => position + 1 < text.Length ? text[position + 1] : '\0';
+    private char Previous => position - 1 >= 0 ? text[position - 1] : '\0';
     private bool Eof => position >= text.Length;
 
     private void Advance(int count = 1) => position += count;
@@ -23,14 +24,14 @@ public class Tokenizer()
         {
             switch (Current)
             {
-                case '#':
-                {
-                    ParseHeading(tokens);
-                    continue;
-                }
                 case '\\':
                 {
                     ParseEscape(tokens);
+                    continue;
+                }
+                case '#':
+                {
+                    ParseHeading(tokens);
                     continue;
                 }
                 case '\n':
@@ -44,6 +45,7 @@ public class Tokenizer()
                     ParseUnderscore(ref italicOpen, ref boldOpen, tokens);
                     continue;
                 }
+
                 case '-':
                 case '*':
                 case '+': 
@@ -63,18 +65,14 @@ public class Tokenizer()
         tokens.Add(Token.EndOfFile());
         return ConvertUnmatchedTokensToText(tokens);
     }
+    
     private bool IsListItemStart()
     {
-        if (position > 0 && text[position - 1] != '\n' && text[position - 1] != '\r')
-            return false;
-
-        return Next == ' ';
+        return (position == 0 || Previous == '\n' || Previous == '\r') && Next == ' ';
     }
 
     private void ParseListItem(List<Token> tokens)
     {
-        var marker = Current; 
-        
         Advance(2); 
 
         tokens.Add(Token.ListItem());
@@ -96,17 +94,16 @@ public class Tokenizer()
         }
     }
 
-    private List<Token> TokenizeListItemContent(string content)
+    private static List<Token> TokenizeListItemContent(string content)
     {
         var tempTokenizer = new Tokenizer();
         var tokens = tempTokenizer.Tokenize(content);
         
         return tokens.Where(t => t.Type != TokenType.EndOfFile).ToList();
     }
+    
     private void ParseUnderscore(ref bool italicOpen, ref bool boldOpen, List<Token> tokens)
     {
-        var firstEscaped = position > 0 && text[position - 1] == '\\';
-
         var start = position;
         var count = 1;
 
@@ -116,7 +113,8 @@ public class Tokenizer()
             Advance();
         }
 
-        if (HandleUnderscoreEdgeCases(italicOpen, boldOpen, tokens, firstEscaped, ref count, ref start)) return;
+        if (HandleUnderscoreEdgeCases(italicOpen, tokens, ref count)) 
+            return;
 
         var kind = AnalyzeUnderscore(text, start, count, ref italicOpen, ref boldOpen);
         AddToken(tokens, kind, count);
@@ -124,29 +122,12 @@ public class Tokenizer()
         Advance();
     }
 
-    private bool HandleUnderscoreEdgeCases(bool italicOpen, bool boldOpen, List<Token> tokens, bool firstEscaped,
-        ref int count,
-        ref int start)
+    private bool HandleUnderscoreEdgeCases(bool italicOpen, List<Token> tokens, ref int count)
     {
-        if (Next == ' ' && !italicOpen && count == 1 ||
-            Next == ' ' && !boldOpen && count == 2)
-        {
-            tokens.Add(Token.Text("_"));
-            Advance();
-            return true;
-        }
-
-        if (firstEscaped)
-        {
-            tokens.Add(Token.Text("_"));
-            count--;
-            start++;
-        }
-
-        if (count > 0) return false;
+        if (Next != ' ' || italicOpen || count != 1) return false;
+        tokens.Add(Token.Text("_"));
         Advance();
         return true;
-
     }
 
     private static void AddToken(List<Token> tokens, EmphasisType kind, int count)
@@ -184,25 +165,82 @@ public class Tokenizer()
 
     private void ParseEscape(List<Token> tokens)
     {
-        Advance();
-        if (Eof) return;
-        tokens.Add(Token.Text(Current.ToString()));
-        Advance();
-    }
+        var backslashCount = 0;
 
-    private void ParseHeading(List<Token> tokens)
-    {
-        if (position > 0 && text[position - 1] == '\\')
+        while (!Eof && text[position] == '\\')
         {
-            tokens.Add(Token.Text("#"));
+            backslashCount++;
+            Advance();
+        }
+
+        if (Eof)
+        {
+            tokens.Add(Token.Text(new string('\\', backslashCount)));
+            return;
+        }
+
+        var next = Current;
+
+        var escapable =
+            next is '\\' or '_' or '#' or '*' or '+' or '-' or '`';
+
+        if (backslashCount % 2 == 1 && !escapable)
+        {
+            tokens.Add(Token.Text(new string('\\', backslashCount) + next));
             Advance();
             return;
         }
 
-        var start = position;
-        while (Current == '#')
+        var pairs = backslashCount / 2;
+        if (pairs > 0)
+            tokens.Add(Token.Text(new string('\\', pairs)));
+
+        if (backslashCount % 2 != 1) 
+            return;
+        
+        var escaped = Current;
+
+        if (escaped == '#')
+        {
+            var start = position;
+            while (!Eof && Current == '#')
+                Advance();
+            tokens.Add(Token.Text(text[start..position]));
+        }
+        else
+        {
+            tokens.Add(Token.Text(escaped.ToString()));
             Advance();
-        tokens.Add(Token.Heading(text[start..position]));
+        }
+    }
+
+    private void ParseHeading(List<Token> tokens)
+    {
+        var start = position;
+        var hashCount = 0;
+    
+        while (Current == '#' && hashCount < 6)
+        {
+            hashCount++;
+            Advance();
+        }
+    
+        var headingText = text[start..position];
+    
+        if (hashCount == 6 && position < text.Length && text[position] == '#')
+        {
+            var extraHashesStart = position;
+            while (Current == '#')
+                Advance();
+        
+            var extraHashes = text[extraHashesStart..position];
+            tokens.Add(Token.Heading(headingText));
+            tokens.Add(Token.Text(extraHashes));
+        }
+        else
+        {
+            tokens.Add(Token.Heading(headingText));
+        }
     }
 
     private static EmphasisType AnalyzeUnderscore(string text, int position, int underscoreCount,
@@ -210,7 +248,7 @@ public class Tokenizer()
     {
         var prevChar = GetChar(text, position - 1);
         var nextChar = GetChar(text, position + underscoreCount);
-
+        
         var prevIsLetter = char.IsLetter(prevChar);
         var nextIsLetter = char.IsLetter(nextChar);
         var prevIsDigit = char.IsDigit(prevChar);
@@ -219,15 +257,28 @@ public class Tokenizer()
         var nextIsSpace = IsWhitespaceOrEnd(text, position + underscoreCount);
         var prevIsPunct = char.IsPunctuation(prevChar);
         var nextIsPunct = char.IsPunctuation(nextChar);
-
-        if (IsInvalidInnerUnderscore(text, position, underscoreCount, prevIsLetter, nextIsLetter) || prevIsDigit ||
-            nextIsDigit)
+        var prevIsEscape = prevChar == '\\';
+        
+        if (underscoreCount == 2 && nextIsSpace)
+        {
+            var searchPos = position + underscoreCount;
+            while (searchPos < text.Length && char.IsWhiteSpace(text[searchPos]))
+            {
+                searchPos++;
+            }
+            if (searchPos < text.Length && text[searchPos] == '_')
+            {
+                return EmphasisType.None;
+            }
+        }
+        
+        if (IsInvalidInnerUnderscore(text, position, underscoreCount, prevIsLetter, nextIsLetter) || prevIsDigit || nextIsDigit)
             return EmphasisType.None;
 
         return underscoreCount switch
         {
             1 => AnalyzeSingleUnderscore(prevIsLetter, prevIsPunct, prevIsSpace,
-                nextIsLetter, nextIsSpace, nextIsPunct,
+                nextIsLetter, nextIsSpace, nextIsPunct, prevIsEscape, 
                 ref italicOpen),
 
             2 => AnalyzeDoubleUnderscore(prevIsSpace, prevIsPunct, prevChar,
@@ -284,22 +335,22 @@ public class Tokenizer()
 
     private static EmphasisType AnalyzeSingleUnderscore(
         bool prevIsLetter, bool prevIsPunct, bool prevIsSpace,
-        bool nextIsLetter, bool nextIsSpace, bool nextIsPunct,
+        bool nextIsLetter, bool nextIsSpace, bool nextIsPunct, bool prevIsEscape,
         ref bool italicOpen)
     {
-        if (prevIsLetter || (prevIsPunct && nextIsLetter))
+        if (prevIsLetter || prevIsPunct)
         {
             italicOpen = !italicOpen;
             return italicOpen ? EmphasisType.ItalicStart : EmphasisType.ItalicEnd;
         }
 
-        if ((prevIsSpace || prevIsPunct) && nextIsLetter)
+        if ((prevIsSpace || prevIsPunct) && nextIsLetter || nextIsPunct)
         {
             italicOpen = true;
             return EmphasisType.ItalicStart;
         }
 
-        if (!prevIsLetter || (!nextIsSpace && !nextIsPunct))
+        if ((!prevIsLetter && !prevIsEscape) || (!nextIsSpace && !nextIsPunct))
             return EmphasisType.None;
 
         italicOpen = false;
@@ -338,8 +389,7 @@ public class Tokenizer()
             _ => EmphasisType.None
         };
     }
-
-
+    
     private static List<Token> ConvertUnmatchedTokensToText(List<Token> tokens)
     {
         var invalidIndices = FindInvalidTokenIndices(tokens);
@@ -400,7 +450,6 @@ public class Tokenizer()
                     break;
             }
         }
-
         return valueTuples;
     }
 
